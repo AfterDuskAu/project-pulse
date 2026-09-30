@@ -1,0 +1,15 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  reader:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: The reader's tests (Python, no packages needed)
+        run: python3 -m unittest -v
+  app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: The app's tests
+        run: cd App && swift test

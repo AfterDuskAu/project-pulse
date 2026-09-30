@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Pulse</title>
+<style>
+/* One window: project tabs top left; then summary → since … → warnings → now / next → the road → parked problems → speed → activity → ideas */
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --fg:#14171b; --muted:#5a626c; --faint:#8b929b; --line:#e1e4e8;
+  --done:#a7afb8; --prog:#2f6fd6; --ready:#12876a; --outlined:#6fb3a0; --todo:#6c5bd4;
+  --red:#c42f2d; --red-bg:#fdecec; --amber:#9a5b00; --amber-bg:#fdf1de;
+  --green:#1c7a39; --green-bg:#e5f4e9; --blue:#2f6fd6; --blue-bg:#e8effc;
+  --sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111316; --panel:#1a1d21; --fg:#e8eaed; --muted:#a4acb6; --faint:#7d858f; --line:#2b3036;
+  --done:#59616b; --prog:#5c94ee; --ready:#2fb58f; --outlined:#4f8f7d; --todo:#978aee;
+  --red:#f06c69; --red-bg:#3a1c1c; --amber:#e8a646; --amber-bg:#3a2a12;
+  --green:#5dc47e; --green-bg:#16301f; --blue:#6aa0f0; --blue-bg:#18263d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111316; --panel:#1a1d21; --fg:#e8eaed; --muted:#a4acb6; --faint:#7d858f; --line:#2b3036;
+  --done:#59616b; --prog:#5c94ee; --ready:#2fb58f; --outlined:#4f8f7d; --todo:#978aee;
+  --red:#f06c69; --red-bg:#3a1c1c; --amber:#e8a646; --amber-bg:#3a2a12;
+  --green:#5dc47e; --green-bg:#16301f; --blue:#6aa0f0; --blue-bg:#18263d; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14.5px;line-height:1.5}
+a{color:inherit;text-decoration-color:var(--faint);text-underline-offset:2px}
+a:hover{color:var(--blue)}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+code,.id,.num{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:12.5px} .faint{color:var(--faint)}
+.top{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.tabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tab{font:inherit;font-size:13.5px;font-weight:600;padding:5px 14px;border-radius:8px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer}
+.tab.on{background:var(--bg);border-color:var(--line);color:var(--fg)}
+.tab .errdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:6px;vertical-align:1px}
+.addhint{font-size:12.5px;color:var(--faint);padding:0 6px}
+.meta{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.meta .stale{color:var(--amber);font-weight:600}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:20px;padding-block:22px 48px;display:flex;flex-direction:column;gap:26px}
+section h2{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+section h2 .count{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
+section h2 a{text-transform:none;letter-spacing:0;font-weight:400;font-size:12.5px;color:var(--faint)}
+h2.red{color:var(--red)} h2.amber{color:var(--amber)}
+.banner{background:var(--amber-bg);color:var(--amber);border-radius:8px;padding:10px 14px;font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+.tile .l{font-size:12px;color:var(--muted)}
+.tile .v{font-size:25px;font-weight:650;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:12.5px;font-weight:400;color:var(--faint)}
+.tile.red .v{color:var(--red)} .tile.amber .v{color:var(--amber)}
+.changes,.warns,.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.changes li,.warns li{display:flex;gap:10px;align-items:baseline;min-width:0}
+.pill{font-size:11px;font-weight:650;padding:2px 8px;border-radius:999px;white-space:nowrap;letter-spacing:.02em;flex:none}
+.p-green{background:var(--green-bg);color:var(--green)} .p-blue{background:var(--blue-bg);color:var(--blue)}
+.p-red{background:var(--red-bg);color:var(--red)} .p-amber{background:var(--amber-bg);color:var(--amber)}
+.p-gray{border:1px solid var(--line);color:var(--muted)}
+.warns li{background:var(--amber-bg);border-radius:8px;padding:8px 12px}
+.warns .wicon{flex:none;width:18px;height:18px;border-radius:50%;background:var(--amber);color:var(--bg);font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.warns a{color:var(--amber);font-size:12.5px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:0}
+.card h3{font-size:13.5px;margin:0 0 8px;font-weight:650;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.k{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:10px 0 4px}
+.k:first-child{margin-top:0}
+.fgroup{margin:4px 0 8px}
+.fdir{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.frow{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding-left:10px}
+.frow .num{color:var(--muted);white-space:nowrap}
+.tag{font-size:11px;margin-left:6px;color:var(--faint);white-space:nowrap}
+.tag.ok{color:var(--ready)} .tag.you{color:var(--blue)} .tag.cut{color:var(--amber)}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;background:var(--line)}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.stage{margin-top:16px}
+.sh{font-size:13.5px;font-weight:650;border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:4px}
+.row{display:grid;grid-template-columns:92px minmax(0,1fr) 190px;gap:10px;align-items:center;padding:3px 0;font-size:13.5px}
+.row .w{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.done .id a,.row.done .w{color:var(--faint)}
+.row .b{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.row .b i{display:block;height:12px;border-radius:0 4px 4px 0;flex:none}
+.gates{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gate{font-size:12.5px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+.gate.done{color:var(--faint);text-decoration:line-through}
+.gate.next,.gate.in-progress{border-color:var(--blue);color:var(--blue);font-weight:650}
+.arrow{color:var(--faint);font-size:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+details.iss{border-top:1px solid var(--line);padding:5px 0}
+details.iss:first-of-type{border-top:0}
+details.iss summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:10px minmax(0,1fr);gap:4px 8px;font-size:13.5px}
+details.iss summary::-webkit-details-marker{display:none}
+details.iss .dot{width:8px;height:8px;border-radius:50%;background:var(--red);margin-top:6px}
+details.iss .t{color:var(--red)}
+details.iss.confirm .dot{background:var(--amber)} details.iss.confirm .t{color:var(--amber)}
+details.iss .note{grid-column:2;font-size:12px;color:var(--faint)}
+details.iss p{margin:6px 0 4px 18px;font-size:12.5px;color:var(--muted)}
+details.more summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:4px 0}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 6px}
+td{border-bottom:1px solid var(--line);padding:4px 6px;vertical-align:top}
+th.num,td.num{text-align:right;white-space:nowrap}
+.good{color:var(--green)} .bad{color:var(--red)}
+.spark{display:flex;align-items:flex-end;gap:3px;height:60px;border-bottom:1px solid var(--line)}
+.spark span{flex:1;background:var(--blue);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+.spark span.zero{background:var(--line)}
+.spark-l{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:4px}
+.plain li{font-size:13.5px}
+footer{font-size:12px;color:var(--faint);border-top:1px solid var(--line);padding-top:12px}
+.err{background:var(--red-bg);color:var(--red);padding:14px 16px;border-radius:10px}
+.err pre{white-space:pre-wrap;font-size:12px;color:var(--muted)}
+@media (max-width:720px){
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .row{grid-template-columns:78px minmax(0,1fr) 84px}
+  .row .w{white-space:normal}
+  .row .b span.lbl{display:none}
+  .meta{margin-left:0}
+}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="top">
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Projects"></nav>
+  <div class="meta" id="meta"></div>
+</div>
+<main class="wrap" id="app"><p class="muted">Loading…</p></main>
+<noscript><p style="padding:20px">This page needs JavaScript to draw its sections.</p></noscript>
+<script id="pulse-data" type="application/json">__PULSE_DATA__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('pulse-data').textContent);
+const UNITS = {S: 1, M: 2, L: 4};
+const STATUS = {
+  'done': {label: 'Done', color: 'var(--done)'},
+  'in-progress': {label: 'In progress', color: 'var(--prog)'},
+  'ready': {label: 'Prompt ready', color: 'var(--ready)'},
+  'outlined': {label: 'Outlined', color: 'var(--outlined)'},
+  'to-write': {label: 'Prompt to write', color: 'var(--todo)'}
+};
+const KIND = {
+  finished: ['Finished', 'p-green'], started: ['Started', 'p-blue'], ready: ['Prompt written', 'p-blue'],
+  added: ['New', 'p-blue'], proposed: ['Proposed', 'p-blue'], progress: ['Moved', 'p-gray'],
+  parked: ['Parked', 'p-red'], warning: ['Warning', 'p-amber'], cleared: ['Cleared', 'p-green'],
+  commit: ['Commit', 'p-gray']
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+function ago(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (!isFinite(ms)) return '';
+  const m = Math.round(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60);
+  return h < 48 ? h + ' h ago' : Math.round(h / 24) + ' days ago';
+}
+function when(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleString(undefined, {weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'});
+}
+function day(isoDay) {
+  const d = new Date(String(isoDay).slice(0, 10) + 'T12:00:00');
+  return isNaN(d) ? String(isoDay) : d.toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+}
+function link(p, path, text, cls) {
+  if (!path) return esc(text);
+  const href = p.obsidian && /\.md$/i.test(path) && path.startsWith(p.path + '/')
+    ? 'obsidian://open?path=' + encodeURIComponent(path)
+    : 'file://' + encodeURI(path);
+  return `<a class="${cls || ''}" href="${esc(href)}">${esc(text)}</a>`;
+}
+const units = s => UNITS[s.size] || 2;
+const tile = (label, value, cls) => `<div class="tile ${cls || ''}"><div class="l">${esc(label)}</div><div class="v">${value}</div></div>`;
+
+let current = 0;
+try { const saved = +localStorage.getItem('pulse.tab'); if (DATA.projects[saved]) current = saved; } catch (e) {}
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = DATA.projects.map((p, i) =>
+    `<button role="tab" class="tab${i === current ? ' on' : ''}" aria-selected="${i === current}" data-i="${i}">${esc(p.name)}${p.error ? '<span class="errdot" aria-label="couldn\'t be read"></span>' : ''}</button>`
+  ).join('') + `<span class="addhint">Add a project in projects.json</span>`;
+  tabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    current = +b.dataset.i;
+    try { localStorage.setItem('pulse.tab', String(current)); } catch (e) {}
+    renderTabs();
+    render();
+  }));
+}
+
+function renderMeta() {
+  const hours = (Date.now() - Date.parse(DATA.generatedAt)) / 3.6e6;
+  document.getElementById('meta').innerHTML =
+    `Updated ${esc(when(DATA.generatedAt))} · <span class="${hours > 6 ? 'stale' : ''}">${esc(ago(DATA.generatedAt))}</span> · refresh: double-click Pulse.command`;
+}
+
+function secStale() {
+  const hours = (Date.now() - Date.parse(DATA.generatedAt)) / 3.6e6;
+  return hours > 6 ? `<div class="banner">This page is ${Math.round(hours)} hours old. Double-click Pulse.command to refresh it.</div>` : '';
+}
+
+function secObsidian(p) {
+  const n = p.obsidianNote;
+  if (!n) return '';
+  if (n.status === 'skipped') return `<div class="banner">${esc(n.message)}</div>`;
+  const open = 'obsidian://open?path=' + encodeURIComponent(n.path);
+  return `<div class="small muted">Also in Obsidian: <a href="${esc(open)}">${esc(n.path.split('/').slice(-2).join('/'))}</a>${n.message ? ' · ' + esc(n.message) : ''}</div>`;
+}
+
+function secSummary(p) {
+  const s = p.summary;
+  const open = p.issues.filter(i => i.state !== 'confirm').length;
+  return `<section class="tiles" aria-label="Summary">
+    ${tile('Roadmap steps done', `${s.stepsDone} <small>of ${s.stepsTotal}</small>`)}
+    ${tile('Work done, by size', `${s.workDonePct}%`)}
+    ${tile('Ready to start', String(s.readyNow.length))}
+    ${tile('Parked problems', `${open} <small>open · ${p.issues.length - open} to confirm</small>`, 'red')}
+    ${tile('Warnings', String(p.warnings.length), p.warnings.length ? 'amber' : '')}
+  </section>`;
+}
+
+function secChanges(p) {
+  let body;
+  if (!p.comparedWith) body = `<p class="muted">This is the first run. Changes show from the next one.</p>`;
+  else if (!p.changes.length) body = `<p class="muted">Nothing has changed.</p>`;
+  else body = `<ul class="changes">${p.changes.map(c => {
+    const k = KIND[c.kind] || [c.kind, 'p-gray'];
+    return `<li><span class="pill ${k[1]}">${esc(k[0])}</span><span>${esc(c.text)}</span></li>`;
+  }).join('')}</ul>`;
+  const since = p.comparedWith ? `Since ${esc(when(p.comparedWith))}` : 'Since the last run';
+  return `<section><h2>${since}${p.comparedWith ? ` <span class="count">${esc(ago(p.comparedWith))}</span>` : ''}</h2>${body}</section>`;
+}
+
+function secWarnings(p) {
+  if (!p.warnings.length) return '';
+  return `<section><h2 class="amber">Warnings <span class="count">things that have drifted</span></h2><ul class="warns">${p.warnings.map(w =>
+    `<li><span class="wicon" aria-hidden="true">!</span><span>${esc(w.text)}${w.file ? ' ' + link(p, w.file, 'Open') : ''}</span></li>`
+  ).join('')}</ul></section>`;
+}
+
+function secNowNext(p) {
+  let now = '';
+  if (!p.git.ok) {
+    now = `<p class="muted">No git history found.</p>`;
+  } else {
+    const h = p.git.head, u = p.git.uncommitted;
+    now += `<span class="k">Last commit</span><div><code>${esc(h.short)}</code> ${esc(h.subject)} <span class="muted small">· ${esc(ago(h.date))}${p.git.branch ? ' · ' + esc(p.git.branch) : ''}</span></div>`;
+    if (!u.files.length) {
+      now += `<span class="k">Not committed yet</span><div class="muted">Nothing. Everything is committed.</div>`;
+    } else {
+      const groups = {};
+      u.files.forEach(f => {
+        const cut = f.path.replace(/\/$/, '').lastIndexOf('/');
+        const dir = cut < 0 ? 'top folder' : f.path.slice(0, cut);
+        (groups[dir] = groups[dir] || []).push(f);
+      });
+      now += `<span class="k">Not committed yet · ${u.files.length} file${u.files.length === 1 ? '' : 's'} · +${u.added} −${u.removed} lines</span>`;
+      now += `<div class="small muted">Last edit ${esc(ago(u.newestEdit))}${u.oldestEdit && u.oldestEdit !== u.newestEdit ? ` · oldest ${esc(ago(u.oldestEdit))}` : ''}</div>`;
+      now += Object.entries(groups).map(([dir, files]) => `<div class="fgroup"><div class="fdir">${esc(dir)}</div>${files.map(f => {
+        const base = f.path.replace(/\/$/, '').split('/').pop() + (f.path.endsWith('/') ? '/' : '');
+        return `<div class="frow"><span>${link(p, p.path + '/' + f.path, base)}${f.code === '??' ? '<span class="tag">new</span>' : f.code === 'D' ? '<span class="tag">deleted</span>' : ''}</span><span class="num">${f.added || f.removed ? `+${f.added} −${f.removed}` : ''}</span></div>`;
+      }).join('')}</div>`).join('');
+    }
+    const m = p.memory;
+    if (m && m.limitBytes) now += `<span class="k">CLAUDE.md size</span><div class="small ${m.leftBytes < 0 || m.leftLines < 0 ? 'bad' : 'muted'}">${m.bytes.toLocaleString()} of ${m.limitBytes.toLocaleString()} bytes, ${m.lines} of ${m.limitLines} lines · ${m.leftBytes.toLocaleString()} bytes and ${m.leftLines} lines left</div>`;
+    const busy = [...p.stages.flatMap(s => s.steps), ...p.otherSteps].filter(s => s.status === 'in-progress');
+    if (busy.length) now += `<span class="k">In progress</span><ul class="plain">${busy.map(s => `<li>${link(p, s.link, s.id, 'id')} ${esc(s.name)}${s.note ? ` <span class="muted">· ${esc(s.note)}</span>` : ''}</li>`).join('')}</ul>`;
+  }
+  let next = '';
+  if (p.memory && p.memory.next) next += `<span class="k">Next, from CLAUDE.md</span><div>${esc(p.memory.next)}</div>`;
+  const ready = p.stages.flatMap(s => s.steps).filter(s => s.readiness === 'ready');
+  next += `<span class="k">Ready to start · nothing it waits for is left</span>` + (ready.length
+    ? `<ul class="plain">${ready.map(s => `<li>${link(p, s.prompt || s.link, s.id, 'id')} ${esc(s.name)} <span class="tag ${s.status === 'ready' ? 'ok' : ''}">${esc(STATUS[s.status].label.toLowerCase())}</span>${s.cut ? '<span class="tag cut">cut line</span>' : ''}</li>`).join('')}</ul>`
+    : `<div class="muted">Nothing is unblocked right now.</div>`);
+  const errands = p.errands.filter(e => !e.done);
+  if (p.waitsOnYou.length || errands.length) {
+    next += `<span class="k">Waits on you</span><ul class="plain">` +
+      p.waitsOnYou.map(w => `<li>${link(p, w.link, w.id, 'id')} ${esc(w.outside.join(', '))}${w.blockedBy.length ? ` <span class="muted small">· also after ${esc(w.blockedBy.join(', '))}</span>` : ''}</li>`).join('') +
+      errands.map(e => `<li><span class="id">errand</span> ${esc(e.text)}</li>`).join('') + `</ul>`;
+  }
+  return `<section class="cols"><div class="card"><h3>Now</h3>${now}</div><div class="card"><h3>Next</h3>${next}</div></section>`;
+}
+
+function stepRow(p, s, withBar) {
+  let state = '';
+  if (s.readiness === 'ready') state = '<span class="tag ok">ready to start</span>';
+  else if (s.readiness === 'blocked') state = `<span class="tag">after ${esc(s.blockedBy.join(', '))}</span>`;
+  else if (s.readiness === 'waits-on-you') state = '<span class="tag you">waits on you</span>';
+  if (s.cut) state += '<span class="tag cut">cut line</span>';
+  const st = STATUS[s.status] || STATUS['to-write'];
+  const label = s.status === 'done' && s.date ? 'Done ' + day(s.date) : st.label;
+  const bar = withBar ? `<i style="width:${units(s) * 24}px;background:${st.color}"></i>${esc(s.size)} · ` : `<i style="width:10px;background:${st.color}"></i>`;
+  return `<div class="row ${s.status === 'done' ? 'done' : ''}"><span class="id">${link(p, s.link, s.id)}</span><span class="w" title="${esc(s.what || s.name)}">${esc(s.name)}${state}</span><span class="b">${bar}<span class="lbl">${esc(label)}</span></span></div>`;
+}
+
+function secRoad(p) {
+  const all = p.stages.flatMap(s => s.steps);
+  const total = all.reduce((a, s) => a + units(s), 0) || 1;
+  const order = ['done', 'in-progress', 'ready', 'outlined', 'to-write'];
+  const segs = order.map(k => [k, all.filter(s => s.status === k).reduce((a, s) => a + units(s), 0)]).filter(x => x[1] > 0);
+  const pct = u => Math.round(u / total * 100) + '%';
+  let h = `<section><h2>The road <span class="count">${all.length} steps in the roadmap</span> ${link(p, p.sources.roadmap, 'Open roadmap')}</h2>
+    <div class="bar" role="img" aria-label="${esc(segs.map(([k, u]) => STATUS[k].label + ' ' + pct(u)).join(', '))}">${segs.map(([k, u]) => `<span style="flex:${u};background:${STATUS[k].color}"></span>`).join('')}</div>
+    <div class="legend">${segs.map(([k, u]) => `<span><i class="sw" style="background:${STATUS[k].color}"></i>${STATUS[k].label} ${pct(u)}</span>`).join('')}<span>Bar length is the step's size: S = 1, M = 2, L = 4</span></div>`;
+  for (const stage of p.stages) {
+    h += `<div class="stage"><div class="sh">${esc(stage.name)}</div>${stage.steps.map(s => stepRow(p, s, true)).join('')}</div>`;
+  }
+  if (p.otherSteps.length || p.proposed.length) {
+    const shown = p.otherSteps.slice(0, 5), rest = p.otherSteps.slice(5);
+    h += `<div class="stage"><div class="sh">Not in the roadmap <span class="faint small">· written up along the way, or proposed</span></div>`;
+    h += p.proposed.map(x => `<div class="row"><span class="id">${link(p, p.sources.nextUp, x.id)}</span><span class="w" title="${esc(x.name)}">${esc(x.name)}<span class="tag you">proposed in NEXT-UP #${x.num}</span></span><span class="b"><i style="width:10px;background:var(--todo)"></i><span class="lbl">Proposed</span></span></div>`).join('');
+    h += shown.map(s => stepRow(p, s, false)).join('');
+    if (rest.length) h += `<details class="more"><summary>${rest.length} more: ${esc(rest.map(s => s.id).join(', '))}</summary>${rest.map(s => stepRow(p, s, false)).join('')}</details>`;
+    h += `</div>`;
+  }
+  if (p.gates.length) {
+    h += `<div class="stage"><div class="sh">Proofs and release gates <span class="faint small">· in order</span></div><div class="gates">${p.gates.map((g, i) =>
+      (i ? '<span class="arrow" aria-hidden="true">›</span>' : '') +
+      `<span class="gate ${esc(g.status)}" title="${esc((g.stage || '') + (g.status ? ' · ' + g.status : ''))}">${g.link ? link(p, g.link, g.name) : esc(g.name)}${g.note ? ' · ' + esc(g.note) : ''}</span>`
+    ).join('')}</div></div>`;
+  }
+  return h + `</section>`;
+}
+
+function secIssues(p) {
+  if (!p.issues.length) return '';
+  const areas = [...new Set(p.issues.map(i => i.area))];
+  const open = p.issues.filter(i => i.state !== 'confirm').length;
+  return `<section><h2 class="red">Parked problems <span class="count">${open} open · ${p.issues.length - open} fixed, to confirm</span> ${link(p, p.sources.knownIssues, 'Open the list')}</h2>
+    <div class="grid2">${areas.map(a => `<div class="card"><h3>${esc(a)}</h3>${p.issues.filter(i => i.area === a).map(i =>
+      `<details class="iss ${esc(i.state)}"><summary><span class="dot" aria-hidden="true"></span><span class="t">${esc(i.title)}</span>${i.note ? `<span class="note">${esc(i.note)}</span>` : ''}</summary><p>${esc(i.text)}</p></details>`
+    ).join('')}</div>`).join('')}</div>
+    <div class="legend"><span><i class="sw" style="background:var(--red)"></i>Open, parked for later</span><span><i class="sw" style="background:var(--amber)"></i>Fixed, waiting to be confirmed</span><span>Click a problem to read the full note</span></div></section>`;
+}
+
+function secSpeed(p) {
+  if (!p.perf || !p.perf.length) return '';
+  const cards = p.perf.map(k => {
+    const L = k.latest, P = k.previous;
+    const before = {};
+    (P ? P.metrics : []).forEach(m => { before[m.name] = m; });
+    const rows = L.metrics.map(m => {
+      const q = before[m.name];
+      let change = '<span class="faint">—</span>';
+      if (q) {
+        const diff = m.median - q.median;
+        change = q.median && Math.abs(diff / q.median) < 0.05 ? '<span class="muted">about the same</span>'
+          : diff < 0 ? `<span class="good">${Math.abs(diff)} ms faster</span>` : `<span class="bad">${diff} ms slower</span>`;
+      }
+      return `<tr><td>${esc(m.name)}</td><td class="num">${m.median} ms${m.worst != null ? ` <span class="faint">(worst ${m.worst})</span>` : ''}</td><td class="num">${q ? q.median + ' ms' : '—'}</td><td class="num">${change}</td></tr>`;
+    }).join('');
+    return `<div class="card"><h3>${esc(k.label)} <span class="faint small">${esc(day(L.when))} · ${link(p, L.path, L.file)}</span></h3>
+      <div class="small muted">Main-thread stalls of 100 ms or more: ${L.stalls100}${P ? ` (before: ${P.stalls100})` : ''} · longest ${L.longestStall} ms${L.valid ? '' : ' · <span class="bad">not a valid run</span>'}</div>
+      <div class="tablewrap"><table><thead><tr><th>Measure</th><th class="num">Now (median)</th><th class="num">Before</th><th class="num">Change</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${P ? `<div class="small faint">Before = ${link(p, P.path, P.file)}, ${esc(day(P.when))}</div>` : ''}</div>`;
+  }).join('');
+  return `<section><h2>Speed <span class="count">the newest bench report compared with the one before it</span></h2><div class="grid2">${cards}</div></section>`;
+}
+
+function secActivity(p) {
+  if (!p.git.ok) return '';
+  const a = p.git.activity, max = Math.max(1, ...a.map(x => x.commits)), total = a.reduce((s, x) => s + x.commits, 0);
+  return `<section class="cols">
+    <div class="card"><h3>Commits in the last 14 days <span class="faint small">${total} in all</span></h3>
+      <div class="spark" role="img" aria-label="${esc(a.map(x => day(x.day) + ': ' + x.commits).join(', '))}">${a.map(x => `<span class="${x.commits ? '' : 'zero'}" title="${esc(day(x.day))}: ${x.commits} commit${x.commits === 1 ? '' : 's'}" style="height:${Math.max(2, Math.round(x.commits / max * 56))}px"></span>`).join('')}</div>
+      <div class="spark-l"><span>${esc(day(a[0].day))}</span><span>today</span></div></div>
+    <div class="card"><h3>Recent commits</h3><ul class="plain">${p.git.recent.map(c => `<li class="small"><code>${esc(c.short)}</code> <span class="faint">${esc(day(c.day))}</span> ${esc(c.subject)}</li>`).join('')}</ul></div>
+  </section>`;
+}
+
+function secIdeas(p) {
+  if (!p.ideas.length) return '';
+  const groups = [...new Set(p.ideas.map(i => i.group))];
+  return `<section><h2>Ideas for later ${link(p, p.sources.roadmap, 'Open roadmap')}</h2><div class="grid2">${groups.map(g =>
+    `<div class="card"><h3>${esc(g)}</h3><ul class="plain">${p.ideas.filter(i => i.group === g).map(i => `<li title="${esc(i.text)}">${esc(i.title)}</li>`).join('')}</ul></div>`
+  ).join('')}</div></section>`;
+}
+
+function secSources(p) {
+  const s = p.sources;
+  const items = [['Roadmap', s.roadmap], ['NEXT-UP', s.nextUp], ['Known issues', s.knownIssues], ['CLAUDE.md', s.memory],
+    ['Step write-ups', s.steps], ['Step prompts', s.prompts], ['Speed reports', s.perf]].filter(x => x[1]);
+  return `<footer>Read from ${esc(p.path)}: ${items.map(([n, path]) => link(p, path, n)).join(' · ')}. Pulse only reads these files and git's history, and it never uses the network.${p.obsidian ? ' Document links open in Obsidian.' : ''}</footer>`;
+}
+
+// A folder Pulse read by itself (no map): its roadmap and groups, straight from the app's view.
+const ROAD_COLOUR = {done: 'var(--done)', doing: 'var(--prog)', ready: 'var(--ready)', todo: 'var(--todo)', blocked: 'var(--amber)'};
+function secAuto(p) {
+  const v = p.view, road = v.roadmap || {stages: [], tiles: [], legend: [], later: []};
+  let h = road.tiles.length && road.stages.length
+    ? `<section class="tiles" aria-label="Summary">${road.tiles.map(t => tile(t.label, `${esc(t.value)}${t.suffix ? ` <small>${esc(t.suffix)}</small>` : ''}`)).join('')}</section>`
+    : `<section><p class="muted">No roadmap found yet. Pulse looks for a table of steps, numbered step prompts, Spec Kit, Kiro, Task Master, Backlog.md, BMAD, or checklists (“- [ ]”) in notes.</p></section>`;
+  h += secChanges(p);
+  if (road.stages.length) {
+    h += `<section><h2>Roadmap ${road.path ? link(p, road.path, 'Open') : ''}</h2>
+      <div class="legend">${road.legend.map(l => `<span><i class="sw" style="background:${ROAD_COLOUR[l.state]}"></i>${esc(l.text)}</span>`).join('')}</div>`;
+    for (const st of road.stages) {
+      h += `<div class="stage"><div class="sh">${esc(st.name)} <span class="muted small">${esc(st.note || '')}</span></div>`;
+      for (const r of st.rows) {
+        const width = r.total ? Math.round(150 * (r.done || 0) / r.total) : 30 * ({S: 1, M: 2, L: 4}[r.size] || 2);
+        h += `<div class="row ${r.state === 'done' ? 'done' : ''}"><span class="id">${r.path ? link(p, r.path, r.label) : esc(r.label)}</span>
+          <span class="w">${esc(r.name)}${r.you ? '<span class="tag you">waits on you</span>' : ''}${r.cut ? '<span class="tag cut">cut line</span>' : ''} <span class="faint small">${esc(r.detail || '')}</span>${r.command ? ` <code>${esc(r.command)}</code>` : ''}</span>
+          <span class="b"><i style="width:${width}px;background:${ROAD_COLOUR[r.state] || 'var(--line)'}"></i>${r.total ? `${r.done || 0} of ${r.total}` : esc(r.size || '')}</span></div>`;
+      }
+      h += `</div>`;
+    }
+    h += `</section>`;
+  }
+  if ((road.later || []).length) {
+    h += `<section><h2>${esc(road.laterTitle || 'Later')}</h2><ul class="plain">${road.later.map(r => `<li><span class="id">${esc(r.label)}</span> ${esc(r.text)}</li>`).join('')}</ul></section>`;
+  }
+  h += `<section class="grid2">${v.groups.filter(g => g.items.length).map(g => `<div class="card"><h3>${esc(g.title)} <span class="faint small">${g.items.length}</span></h3>
+    <ul class="plain">${g.items.map(i => `<li><span class="faint small">${esc(i.label)}</span> ${i.path ? link(p, i.path, i.title) : esc(i.title)}${i.detail ? ` <span class="faint small">${esc(i.detail)}</span>` : ''}${i.command ? ` <code>${esc(i.command)}</code>` : ''}</li>`).join('')}</ul></div>`).join('')}</section>`;
+  return h + `<footer>Read by itself from ${esc(p.path)}: Pulse worked out this folder's layout, only reading its files and git's history, with no AI and no network.</footer>`;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  const p = DATA.projects[current];
+  if (!p) { app.innerHTML = `<p class="muted">No projects yet. Add one to projects.json, then double-click Pulse.command.</p>`; return; }
+  if (p.error) {
+    app.innerHTML = `<div class="err"><strong>Couldn't read ${esc(p.name)}.</strong> ${esc(p.error)}<pre>${esc(p.trace || '')}</pre></div>`;
+    return;
+  }
+  if (p.kind === 'auto') {
+    app.innerHTML = secStale() + secAuto(p);
+    return;
+  }
+  app.innerHTML = secStale() + secObsidian(p) + secSummary(p) + secChanges(p) + secWarnings(p) + secNowNext(p) + secRoad(p) +
+    secIssues(p) + secSpeed(p) + secActivity(p) + secIdeas(p) + secSources(p);
+}
+
+renderTabs();
+renderMeta();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "projects": [
+    {"name": "My App", "path": "~/Developer/MyApp"},
+    {"name": "Website", "path": "~/Developer/website", "off": ["codenotes"]}
+  ]
+}

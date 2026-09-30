@@ -1,0 +1,13 @@
+# Your own data: it stays on your Mac and is never published
+projects.json
+comments/
+state/
+out/
+
+# What the build makes
+Pulse.app/
+App/.build/
+.build/
+__pycache__/
+*.pyc
+.DS_Store
